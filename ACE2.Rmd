@@ -1,0 +1,47 @@
+---
+title: "ACE2"
+author: "Ilya Fischhoff"
+date: "4/29/2020"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#####install packages
+```{r packages, echo=FALSE}
+pkgTest <- function(x)
+{
+  if (x %in% rownames(installed.packages()) == FALSE) {
+    install.packages(x, dependencies= TRUE)    
+  }
+  library(x, character.only = TRUE)
+}
+neededPackages <- c( "ggplot2", "rentrez", "plyr", "seqinr", "foreach","broom", "remotes", "Biostrings", "stringr", "phylotools", "data.table")
+for (package in neededPackages){pkgTest(package)}
+
+```
+
+
+##check that set of mammals is contained in set of vertebrates
+```{r}
+A <- read.csv("ACE2GenBank - Sheet1.csv")
+```
+
+
+Get protein based on accession ID
+```{r}
+refIDs <- A$AccessionNum
+ SEQS <- foreach(i = refIDs, .errorhandling = "pass") %do% {
+  SRCH <- entrez_search(db = "nuccore", term = i)
+  entrez_fetch(db = "protein", id = entrez_link(dbfrom = "nuccore", id = SRCH[[1]], db = "protein")$links[[1]], rettype = "fasta")
+ }
+ 
+SEQS
+#  SEQS_test <- lapply(SEQS, as.data.frame)
+# SEQS_test <- plyr::rbind.fill(SEQS_test)
+
+```
+
+
