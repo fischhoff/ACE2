@@ -250,18 +250,23 @@ for (a in 1:length(M_list)){
 out = rbind(out, tmp)
 
 fish = c("Actinopterygii", "Sarcopterygii", "Holocephali", "Cephalaspidomorphi", "Elasmobranchii")
-out_no_fish = subset(out, !(Class %in% fish))
-ACE2_sequences = out_no_fish
+is_fish = rep(0, dim(out)[1])
+
+fish_inds = which(out$Class %in% fish)
+is_fish[fish_inds]=1
+out$is_fish = is_fish
+
+ACE2_sequences = out
 ACE2_sequences$nchar = nchar(ACE2_sequences$sequence)
-#remove any sequences that are shorter than 600 amino acids
-ACE2_sequences = subset(ACE2_sequences, nchar >= 600)
+#remove any sequences that are shorter than 600 amino acids; nope, leaving them all in
+# ACE2_sequences = subset(ACE2_sequences, nchar >= 600)
 
 write.csv(ACE2_sequences, file = "ACE2_sequences.csv")
 DF = ACE2_sequences[, c("name", "sequence")]
 names(DF)[names(DF)=="name"]="seq.name"
 names(DF)[names(DF)=="sequence"]="seq.text"
 
-dat2fasta(DF, outfile = "ACE2_no_fish.fasta")
+dat2fasta(DF, outfile = "ACE2.fasta")
 ```
 
-    ## ACE2_no_fish.fasta has been saved to  /Users/fischhoff/ilya documents/R/COVID19/ACE2
+    ## ACE2.fasta has been saved to  /Users/fischhoff/ilya documents/R/COVID19/ACE2
