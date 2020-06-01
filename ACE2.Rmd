@@ -26,7 +26,9 @@ for (package in neededPackages){pkgTest(package)}
 
 ##check that set of mammals is contained in set of vertebrates
 ```{r}
-A <- read.csv("ACE2GenBank - Sheet1.csv")
+A <- read.csv("ACE2GenBank - GenBank.csv")
+names(A)[names(A)=="AccessionNum"]="AccessionNumGene"
+save(A, file= "A.Rdata")
 ```
 
 
@@ -38,10 +40,121 @@ refIDs <- A$AccessionNum
   entrez_fetch(db = "protein", id = entrez_link(dbfrom = "nuccore", id = SRCH[[1]], db = "protein")$links[[1]], rettype = "fasta")
  }
  
-SEQS
-#  SEQS_test <- lapply(SEQS, as.data.frame)
-# SEQS_test <- plyr::rbind.fill(SEQS_test)
+inds_missing = NULL
+for (a in 1:length(refIDs)){
+  if( (SEQS[[a]][1]=="subscript out of bounds")==TRUE){
+    inds_missing = c(inds_missing, a)
+  }
+} 
 
+inds_empty = NULL
+for (a in 1:length(refIDs)){
+  if( (str_detect(SEQS[[a]][1],"empty"))==TRUE){
+    inds_empty = c(inds_empty, a)
+  }
+} 
+
+inds_none = c(inds_missing, inds_empty)
+
+
+inds_okay = setdiff(seq(1, length(refIDs)),inds_none)
+
+length(inds_okay)+length(inds_none)== length(refIDs)
+SEQS_ok = SEQS[inds_okay]
+
+out = NULL
+for (a in 1:length(inds_okay)){
+  output= str_split(SEQS_ok[a],"\n")
+  output = data.frame(output)
+  lines = dim(output)[1]
+  name = output[1,]
+  acc = str_split(name, " ")
+  accession = acc[[1]][1]
+  accession = str_replace(accession, ">", "")
+  sequence = str_c(output[c(2:lines),], collapse = "")
+  tmp = data.frame(AccessionNumProtein = accession,
+                   name = name,
+                   sequence = sequence)
+  out = rbind(out, tmp)
+}
+
+A_ok = A[inds_okay, ]
+
+out$AccessionNumGene = refIDs[inds_okay]
+out = merge(out, A_ok)
+keep = c("AccessionNumGene", "AccessionNumProtein", "name", "sequence" ,  "Species" , "Order", "Class")
+out = out[, keep]
+# A_ok = cbind(A_ok, out$AccessionNumProtein)
+# A_ok = cbind(A_ok, out$name)
+# A_ok = cbind(A_ok, out$sequence)
+
+refIDs[inds_none]
+
+none_list = c("sequence_KAB0345583.1.fasta",
+              "sequence_VFV30336.1.fasta",
+              "sequence_KAF0878287.1.fasta",
+              "sequence_AAY57872.1.fasta",
+              "sequence_NP_001358344.1.fasta")
+
+tmp = NULL
+for (a in 1:length(none_list)){
+  fastaFile = readAAStringSet(none_list[a])
+  seq_name = names(fastaFile)
+  sequence = paste(fastaFile)
+  df1 <- data.frame(AccessionNumProtein = refIDs[inds_none][a],name = seq_name, sequence)
+  A_tmp = subset(A, AccessionNumGene == df1$AccessionNumProtein)
+  df1$Species = A_tmp$Species
+  df1$Order = A_tmp$Order
+  df1$Class = A_tmp$Class
+  df1$AccessionNumGene = "NA"
+  tmp = rbind(tmp, df1)
+}
+
+out = rbind(out, tmp)
+save(out, file = "out.Rdata")
 ```
 
+##read in a fasta file from MEROPS
+```{r}
+rm(list = ls())
+load("out.Rdata")
+out$database = "GenBank"
+
+M<- read.csv("ACE2GenBank - MEROPS.csv")
+
+M_list = paste0(M$AccessionNum, "_original.fasta")
+
+tmp = NULL
+for (a in 1:length(M_list)){
+  fastaFile = readAAStringSet(M_list[a])
+  name = names(fastaFile)
+  sequence = paste(fastaFile)
+  sequence = gsub('[[:digit:]]+', '', sequence)
+  sequence = gsub("[[:space:]]", "", sequence)
+  df1 <- data.frame(name, sequence)
+  df1$AccessionNumProtein = M$AccessionNum[a]
+  df1$AccessionNumGene = "NA"
+  df1$Species = M$Species[a]
+  df1$Order = M$Order[a]
+  df1$Class = M$Class[a]
+  df1$database = "MEROPS"
+  tmp = rbind(tmp, df1)
+}
+
+out = rbind(out, tmp)
+
+fish = c("Actinopterygii", "Sarcopterygii", "Holocephali", "Cephalaspidomorphi", "Elasmobranchii")
+out_no_fish = subset(out, !(Class %in% fish))
+ACE2_sequences = out_no_fish
+ACE2_sequences$nchar = nchar(ACE2_sequences$sequence)
+#remove any sequences that are shorter than 600 amino acids
+ACE2_sequences = subset(ACE2_sequences, nchar >= 600)
+
+write.csv(ACE2_sequences, file = "ACE2_sequences.csv")
+DF = ACE2_sequences[, c("name", "sequence")]
+names(DF)[names(DF)=="name"]="seq.name"
+names(DF)[names(DF)=="sequence"]="seq.text"
+
+dat2fasta(DF, outfile = "ACE2_no_fish.fasta")
+```
 
